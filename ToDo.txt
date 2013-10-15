@@ -1,4 +1,4 @@
-**************************************************
+﻿**************************************************
 **************************************************
 20.09.2013
 **************************************************
@@ -55,5 +55,6 @@ en p1.c, se recupera 'mal' en el cin.
 el problema es que al incluir el first de expresion
 en el test, este no adelanta la entrada
 
-
-
+15.10.2013
+*************************************************
+Ver filmina 19 de la teoría de Recuperación de Errores
