@@ -18,6 +18,7 @@
 #include <string.h>
 #include "ts.h"
 #include <stdlib.h>
+#include "var_globales.h"
 
 /*
 =====================================================================
@@ -209,6 +210,7 @@ int insertarTS()   // la inf. del identif. esta en inf_id que es global
         if ( en_nivel_actual(inf_id->nbre) >=0  )
         {
             error_handler(9);
+            flagDetenerGenCod=1;
             memset((void*)inf_id, 0, sizeof(entrada_TS));
             return 0;      //al retornar 0 indico que NO lo pude insertar
         }

@@ -26,6 +26,7 @@ EXTERNA int flagExisteIDDeclaracion;
 EXTERNA int flagExisteIDParametro;
 EXTERNA int flagLlamadaFcion;
 EXTERNA int flagEnPropES;
+EXTERNA int flagDetenerGenCod;
 
 
 

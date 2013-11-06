@@ -43,6 +43,7 @@
 #include "var_globales.h"
 #include "ts.h"
 #include "set.h"
+#include "soporte_ejecucion.h"
 
 
 /*********** prototipos *************/
@@ -93,6 +94,7 @@ void test(set,set,int);
 
 token *sbol;
 set folsetLlamada;
+float CODE[5000]={INPP,ALOC,sizeof(int),LEER,1,ALM,0,0,1,CRCT,1,35,CRVL,0,0,1,CMME,1,ENBL,1,FINB,1,IMPR,1,PARAR};
 
 extern FILE *yyin;
 
@@ -145,7 +147,7 @@ int main( int argc,char *argv[])
         }
     }
 
-    if (strcmp(argv[1],"-c")*(strcmp(argv[1], "-g")))
+    if (strcmp(argv[1],"-c")*(strcmp(argv[1], "-e")))
     {
         // Entra por esta rama si la multiplicacion de las comparaciones da como resultado un numero distinto de cero, indicando que el segundo argumento no es valido. Esto ya que la función strcmp retorna cero cuando las cadenas pasadas como parametro son iguales.
         error_handler(83);
@@ -155,9 +157,11 @@ int main( int argc,char *argv[])
     else
     {
         //Entra por esta rama cuando la multiplicación retorna cero, indicando que el parametro es "-c" o "-g".
-        if (strcmp(argv[1],"-g")!=0)
+        if (strcmp(argv[1],"-c")==0)
         {
             //Entra por esta rama si el parametro ingresado es "-c"
+
+            flagDetenerGenCod = 0;
 
             sbol=&token1 ;/* la variable token */
             inic_tablas();
@@ -171,50 +175,67 @@ int main( int argc,char *argv[])
             {
                 error_handler(84);
                 error_handler(COD_IMP_ERRORES);   //no es una decl valida
+                flagDetenerGenCod=1;
             }
 
-            //Controlamos las condiciones que debe cumplir el Main
-            int posEnTablaMain;
-            posEnTablaMain = en_tabla("main");
-            if (posEnTablaMain == NIL)  // O sea que no existe...
-            {
-                error_handler(15);
-                error_handler(COD_IMP_ERRORES);
-            }
-            else // existe :P
-            {
-                if (ts[posEnTablaMain].ets->clase != CLASFUNC) //controlamos si es una funcion
-                {
-                    error_handler(43);
-                    error_handler(COD_IMP_ERRORES);
-                }
-                else
-                {
-                    if (ts[posEnTablaMain].ets->ptr_tipo != en_tabla("void") ) // se compara con cero para determinar si su retorno es void
-                    {
-                        error_handler(35);
-                        error_handler(COD_IMP_ERRORES);
-                    }
-                    else
-                    {
-                        if(ts[posEnTablaMain].ets->desc.part_var.sub.cant_par!=0) // controlamos que el main no tenga parametros
-                        {
-                            error_handler(36);
-                            error_handler(COD_IMP_ERRORES);
-                        }
-                        else
-                        {
-                            // El main cumple todas las condiciones evaluadas
-                            // Si no hay errores, mostrar Compilacion Exitosa
-                        }
+			//Controlamos las condiciones que debe cumplir el Main
+			int posEnTablaMain;
+			posEnTablaMain = en_tabla("main");
+			if (posEnTablaMain == NIL)  // O sea que no existe...
+			{
+				error_handler(15);
+				error_handler(COD_IMP_ERRORES);
+				flagDetenerGenCod=1;
+			}
+			else // existe :P
+			{
+				if (ts[posEnTablaMain].ets->clase != CLASFUNC) //controlamos si es una funcion
+				{
+					error_handler(43);
+					error_handler(COD_IMP_ERRORES);
+					flagDetenerGenCod=1;
+				}
+				else
+				{
+					if (ts[posEnTablaMain].ets->ptr_tipo != en_tabla("void") ) // se compara con cero para determinar si su retorno es void
+					{
+						error_handler(35);
+						error_handler(COD_IMP_ERRORES);
+						flagDetenerGenCod=1;
+					}
+					else
+					{
+						if(ts[posEnTablaMain].ets->desc.part_var.sub.cant_par!=0) // controlamos que el main no tenga parametros
+						{
+							error_handler(36);
+							error_handler(COD_IMP_ERRORES);
+							flagDetenerGenCod=1;
+						}
+						else
+						{
+							// El main cumple todas las condiciones evaluadas
+							// Si no hay errores, mostrar Compilacion Exitosa
+						}
 
-                    }
-                }
-            }
+					}
+				}
+			}
+			if (flagDetenerGenCod == 0)
+			{
+
+				FILE* fp = fopen("codigoObjeto.o", "wb");
+				//
+				fwrite(CODE,sizeof(CODE),1,fp);
+				fclose(fp);
+
+			}
         }
         else
         {
-            // Entra por esta rama si el parametro que se le da a ucc es "-g"
+            // Entra por esta rama si el parametro que se le da a ucc es "-e"
+            Ejecutor(argv[2]);
+
+
         }
     }
 
@@ -228,10 +249,10 @@ void unidad_traduccion(set folset)
     test(first(UNIDAD_TRADUCCION),folset,50);
     while (sbol->codigo == CVOID || sbol->codigo == CCHAR ||
             sbol->codigo == CINT || sbol->codigo == CFLOAT )
-    {
-        folsetLlamada=une(folset,first(DECLARACIONES));
-        declaraciones(folsetLlamada);
-    }
+        {
+            folsetLlamada=une(folset,first(DECLARACIONES));
+            declaraciones(folsetLlamada);
+        }
 }
 
 void declaraciones(set folset)
@@ -255,6 +276,7 @@ void declaraciones(set folset)
     {
         flagExisteIDDeclaracion=0;
         error_handler(16);
+        flagDetenerGenCod=1;
     }
     especificador_declaracion(folset);
 }
@@ -290,6 +312,7 @@ void especificador_tipo(set folset)
     }
     default:
         error_handler(17);
+        flagDetenerGenCod=1;
     }
     test(folset,cons(NADA,NADA),52);
 }
@@ -334,6 +357,7 @@ void especificador_declaracion(set folset)
             if(ultimoTipo==en_tabla("void")) // las vbles no pueden ser de tipo void
             {
                 error_handler(49);
+                flagDetenerGenCod=1;
                 ts[en_tabla(ultimoID)].ets->ptr_tipo=en_tabla("TIPOERROR");
             }
             else
@@ -354,6 +378,7 @@ void especificador_declaracion(set folset)
 
     default:
         error_handler(18);
+        flagDetenerGenCod=1;
     }
 
 }
@@ -363,17 +388,25 @@ void definicion_funcion(set folset)
     test(first(DEFINICION_FUNCION),une(folset,une(first(LISTA_DECLARACIONES_PARAM),une(first(PROPOSICION_COMPUESTA),cons(CPAR_CIE,NADA)))),53);
 
     if (sbol->codigo == CPAR_ABR) scanner();
-    else error_handler(19);
+    else
+    {
+		error_handler(19);
+		flagDetenerGenCod=1;
+	}
 
     if (sbol->codigo == CVOID || sbol->codigo == CCHAR ||
             sbol->codigo == CINT || sbol->codigo == CFLOAT || sbol->codigo==CIDENT)
-    {
+        {
         folsetLlamada= une(folset,une(cons(CPAR_CIE,NADA),first(PROPOSICION_COMPUESTA)));
         lista_declaraciones_param(folsetLlamada);
-    }
+        }
 
     if (sbol->codigo == CPAR_CIE) scanner();
-    else error_handler(20);
+    else
+    {
+		error_handler(20);
+		flagDetenerGenCod=1;
+	}
 
     proposicion_compuesta(folset);
 
@@ -385,34 +418,36 @@ void definicion_funcion(set folset)
     int posUltimoIdentificadorFuncion = en_tabla(ultimoIdentificadorFuncion);
     if (posUltimoIdentificadorFuncion != NIL)
     {
-        if (ts[posUltimoIdentificadorFuncion].ets->ptr_tipo != en_tabla("void")) //distinto de void
-        {
-            if (!existeReturn)
-            {
-                ///Mirar
-                printf("Linea %d -\n", nro_linea);
-                printf("\t Error 37: Falta return\n");
-                //error_handler(37);
-                //error_handler(COD_IMP_ERRORES);
-            }
-        }
-        else
-        {
-            if (existeReturn)
-            {
-                ///Mirar
-                printf("Linea %d -\n", nro_linea);
-                printf("\t Error 45: La funcion no deberia tener retorno, ya que fue declarada con retorno void\n");
-                //error_handler(45);
-                //error_handler(COD_IMP_ERRORES);
-            }
+		if (ts[posUltimoIdentificadorFuncion].ets->ptr_tipo != en_tabla("void")) //distinto de void
+		{
+			if (!existeReturn)
+			{
+				///Mirar
+				printf("Linea %d -\n", nro_linea);
+				printf("\t Error 37: Falta return\n");
+				flagDetenerGenCod=1;
+				//error_handler(37);
+				//error_handler(COD_IMP_ERRORES);
+			}
+		}
+		else
+		{
+			if (existeReturn)
+			{
+				///Mirar
+				printf("Linea %d -\n", nro_linea);
+				printf("\t Error 45: La funcion no deberia tener retorno, ya que fue declarada con retorno void\n");
+				flagDetenerGenCod=1;
+				//error_handler(45);
+				//error_handler(COD_IMP_ERRORES);
+			}
 
-        }
-    }
-    else
-    {
-    }
-    existeReturn=0;
+		}
+	}
+	else
+	{
+	}
+	existeReturn=0;
 
 }
 
@@ -427,7 +462,10 @@ void lista_declaraciones_param(set folset)
         if(sbol->codigo==CCOMA)
             scanner();
         else
+        {
             error_handler(75);
+            flagDetenerGenCod=1;
+		}
         folsetLlamada= une(folset,une(cons(CCOMA,NADA),first(DECLARACION_PARAMETRO)));
         declaracion_parametro(folsetLlamada);
     }
@@ -456,6 +494,7 @@ void declaracion_parametro(set folset)
         if(ultimoTipo==en_tabla("void")) // controlamos que el tipo del par no sea void
         {
             error_handler(80);
+            flagDetenerGenCod=1;
             inf_id->ptr_tipo=en_tabla("TIPOERROR");
         }
         else
@@ -487,6 +526,7 @@ void declaracion_parametro(set folset)
     else
     {
         error_handler(16);
+        flagDetenerGenCod=1;
         flagExisteIDParametro=0;
     }
 
@@ -497,6 +537,7 @@ void declaracion_parametro(set folset)
             if(fueAmp) //el arreglo no puede ser de pasaje por referencia
             {
                 error_handler(81);
+                flagDetenerGenCod=1;
                 ts[en_tabla(ultimoID)].ets->ptr_tipo=en_tabla("TIPOARREGLO");
                 ts[en_tabla(ultimoID)].ets->desc.part_var.arr.ptero_tipo_base=en_tabla("TIPOERROR");
             }
@@ -520,7 +561,11 @@ void declaracion_parametro(set folset)
         scanner();
 
         if (sbol->codigo == CCOR_CIE) scanner();
-        else error_handler(21);
+        else
+        {
+			error_handler(21);
+			flagDetenerGenCod=1;
+		}
     }
     // Actualizamos la lista encadenada de parametros
     if(flagExisteIDDeclaracion==1 && flagExisteIDParametro==1)
@@ -568,6 +613,7 @@ void lista_declaraciones_init(set folset)
         if(ultimoTipo==en_tabla("void")) // las vbles no pueden ser void
         {
             error_handler(49);
+            flagDetenerGenCod=1;
             inf_id->ptr_tipo=en_tabla("TIPOERROR");
         }
         else
@@ -583,6 +629,7 @@ void lista_declaraciones_init(set folset)
     else
     {
         error_handler(16);
+        flagDetenerGenCod=1;
         flagExisteIDDeclaracion=0;
     }
 
@@ -594,7 +641,10 @@ void lista_declaraciones_init(set folset)
         if(sbol->codigo==CCOMA)
             scanner();
         else
+        {
             error_handler(75);
+            flagDetenerGenCod=1;
+		}
 
         if (sbol->codigo == CIDENT)
         {
@@ -604,6 +654,7 @@ void lista_declaraciones_init(set folset)
             if(ultimoTipo==en_tabla("void")) // las vbles no pueden ser void
             {
                 error_handler(49);
+                flagDetenerGenCod=1;
                 inf_id->ptr_tipo=en_tabla("TIPOERROR");
             }
             else
@@ -616,7 +667,11 @@ void lista_declaraciones_init(set folset)
             //---------------------------------------------------------
             scanner();
         }
-        else error_handler(16);
+        else
+        {
+			error_handler(16);
+			flagDetenerGenCod=1;
+		}
 
         folsetLlamada= une(folset,une(first(DECLARADOR_INIT),cons(CCOMA,CIDENT)));
         declarador_init(folsetLlamada);
@@ -640,7 +695,11 @@ void declaracion_variable(set folset)
     }
 
     if (sbol->codigo == CPYCOMA) scanner();
-    else error_handler(22);
+    else
+    {
+		error_handler(22);
+		flagDetenerGenCod=1;
+	}
 
     test(folset,cons(NADA,NADA),54); /// se controla aca en lugar de al final de especificador_declaracion
 
@@ -650,8 +709,8 @@ void declaracion_variable(set folset)
 void declarador_init(set folset)
 {
 
-    test(une(first(DECLARADOR_INIT),cons(CPYCOMA|CCOMA|CCHAR|CINT|CVOID|CFLOAT,CIDENT)),une(folset,cons(CCOR_CIE|CLLA_ABR|CLLA_CIE,NADA)),58);
-    // al test, en el priemr parametro le agregamos la coma y el punto y coma porque lambda esta en el first de declarador_init, y lo que le puede seguir es justamente la coma y el punto y coma
+    test(une(first(DECLARADOR_INIT),cons(CPYCOMA|CCOMA|CCHAR|CINT|CFLOAT|CVOID,CIDENT)),une(folset,cons(CCOR_CIE|CLLA_ABR|CLLA_CIE,NADA)),58);
+    // al test, en el primer parametro le agregamos el punto y coma y la coma porque lambda esta en el first de declarador_init, y lo que le puede seguir es justamente el punto y coma
 
     switch (sbol->codigo)
     {
@@ -664,7 +723,10 @@ void declarador_init(set folset)
         if(sbol->codigo==CASIGNAC)
             scanner();
         else
+        {
             error_handler(78);
+            flagDetenerGenCod=1;
+		}
         constante(folset);
         break;
     }
@@ -676,12 +738,16 @@ void declarador_init(set folset)
         if(sbol->codigo==CCOR_ABR)
             scanner();
         else
+        {
             error_handler(79);
+            flagDetenerGenCod=1;
+		}
         if(flagExisteIDDeclaracion==1)
         {
             if(ultimoTipo==en_tabla("void"))//el arreglo no puede ser void. si lo es, actualizamos el tipo base a error
             {
                 error_handler(46);
+                flagDetenerGenCod=1;
                 ts[en_nivel_actual(ultimoID)].ets->desc.part_var.arr.ptero_tipo_base=en_tabla("TIPOERROR");
             }
             else
@@ -705,20 +771,32 @@ void declarador_init(set folset)
             //entra si no se puso el ident de la vble
         }
         if (sbol->codigo == CCOR_CIE) scanner();
-        else error_handler(21);
+        else
+        {
+			error_handler(21);
+			flagDetenerGenCod=1;
+		}
 
         if (sbol->codigo == CASIGNAC)
         {
             scanner();
 
             if (sbol->codigo == CLLA_ABR) scanner();
-            else error_handler(23);
+            else
+            {
+				error_handler(23);
+				flagDetenerGenCod=1;
+			}
 
             folsetLlamada= une(folset,cons(CLLA_CIE,NADA));
             lista_inicializadores(folsetLlamada);
 
             if (sbol->codigo == CLLA_CIE) scanner();
-            else error_handler(24);
+            else
+            {
+				error_handler(24);
+				flagDetenerGenCod=1;
+			}
 
         }
 
@@ -740,7 +818,10 @@ void lista_inicializadores(set folset)
         if(sbol->codigo==CCOMA)
             scanner();
         else
+        {
             error_handler(75);
+            flagDetenerGenCod=1;
+		}
         folsetLlamada= une(folset,une(cons(CCOMA,NADA),first(CONSTANTE)));
         constante(folsetLlamada);
         cantElementosArreglos++;
@@ -751,6 +832,7 @@ void lista_inicializadores(set folset)
         if(cantidad<cantElementosArreglos)
         {
             error_handler(86);
+            flagDetenerGenCod=1;
         }
     }
     else
@@ -769,15 +851,19 @@ void proposicion_compuesta(set folset)
     {
         scanner();
     }
-    else error_handler(23);
+    else
+    {
+		error_handler(23);
+		flagDetenerGenCod=1;
+	}
 
     if (sbol->codigo == CVOID || sbol->codigo == CCHAR ||
             sbol->codigo == CINT || sbol->codigo == CFLOAT)
 
-    {
-        folsetLlamada= une(folset,une(cons(CLLA_CIE,NADA),first(LISTA_PROPOSICIONES)));
-        lista_declaraciones(folsetLlamada);
-    }
+        {
+            folsetLlamada= une(folset,une(cons(CLLA_CIE,NADA),first(LISTA_PROPOSICIONES)));
+            lista_declaraciones(folsetLlamada);
+        }
 
 
     if (sbol->codigo == CLLA_ABR || sbol->codigo == CMAS ||
@@ -789,10 +875,10 @@ void proposicion_compuesta(set folset)
             sbol->codigo == CIN || sbol->codigo == COUT ||
             sbol->codigo == CPYCOMA || sbol->codigo == CRETURN)
 
-    {
-        folsetLlamada= une(folset,cons(CLLA_CIE,NADA));
-        lista_proposiciones(folsetLlamada);
-    }
+        {
+            folsetLlamada= une(folset,cons(CLLA_CIE,NADA));
+            lista_proposiciones(folsetLlamada);
+        }
 
 
     if (sbol->codigo == CLLA_CIE)
@@ -801,7 +887,11 @@ void proposicion_compuesta(set folset)
 
         scanner();
     }
-    else error_handler(24);
+    else
+    {
+		error_handler(24);
+		flagDetenerGenCod=1;
+	}
 
     test(folset,cons(NADA,NADA),61);
 }
@@ -814,10 +904,10 @@ void lista_declaraciones(set folset)
     while (sbol->codigo == CVOID || sbol->codigo == CCHAR ||
             sbol->codigo == CINT || sbol->codigo == CFLOAT)
 
-    {
-        folsetLlamada= une(folset,first(DECLARACION));
-        declaracion(folsetLlamada);
-    }
+        {
+            folsetLlamada= une(folset,first(DECLARACION));
+            declaracion(folsetLlamada);
+        }
 
 
 }
@@ -832,7 +922,11 @@ void declaracion(set folset)
     lista_declaraciones_init(folsetLlamada);
 
     if (sbol->codigo == CPYCOMA) scanner();
-    else error_handler(22);
+    else
+    {
+		error_handler(22);
+		flagDetenerGenCod=1;
+	}
 
     test(folset,cons(NADA,NADA),62);
 
@@ -854,10 +948,10 @@ void lista_proposiciones(set folset)
             sbol->codigo == CPYCOMA || sbol->codigo == CRETURN)
 
 
-    {
-        folsetLlamada= une(folset,first(PROPOSICION));
-        proposicion(folsetLlamada);
-    }
+            {
+                folsetLlamada= une(folset,first(PROPOSICION));
+                proposicion(folsetLlamada);
+            }
 
 
 }
@@ -900,6 +994,7 @@ void proposicion(set folset)
         break;
     default:
         error_handler(25);
+        flagDetenerGenCod=1;
     }
 }
 
@@ -908,20 +1003,32 @@ void proposicion_iteracion(set folset)
     //test(); No va porque solo tiene una invocacion, y es condicional
 
     if (sbol->codigo == CWHILE) scanner();
-    else error_handler(26);
+    else
+    {
+		error_handler(26);
+		flagDetenerGenCod=1;
+	}
 
     if (sbol->codigo == CPAR_ABR)
     {
         scanner();
 
     }
-    else error_handler(19);
+    else
+    {
+		error_handler(19);
+		flagDetenerGenCod=1;
+	}
 
     folsetLlamada= une(folset,une(cons(CPAR_CIE,NADA),first(PROPOSICION)));
     expresion(folsetLlamada);
 
     if (sbol->codigo == CPAR_CIE) scanner();
-    else error_handler(20);
+    else
+    {
+		error_handler(20);
+		flagDetenerGenCod=1;
+	}
 
     proposicion(folset);
 
@@ -933,20 +1040,32 @@ void proposicion_seleccion(set folset)
     //test(); No va porque solo tiene una invocacion, y es condicional
 
     if (sbol->codigo == CIF) scanner();
-    else error_handler(27);
+    else
+    {
+		error_handler(27);
+		flagDetenerGenCod=1;
+	}
 
     if (sbol->codigo == CPAR_ABR)
     {
         scanner();
 
     }
-    else error_handler(19);
+    else
+    {
+		error_handler(19);
+		flagDetenerGenCod=1;
+	}
 
     folsetLlamada= une(folset,une(cons(CPAR_CIE|CELSE,NADA),first(PROPOSICION)));
     expresion(folsetLlamada);
 
     if (sbol->codigo == CPAR_CIE) scanner();
-    else error_handler(20);
+    else
+    {
+		error_handler(20);
+		flagDetenerGenCod=1;
+	}
 
     folsetLlamada= une(folset,une(cons(CELSE,NADA),first(PROPOSICION)));
     proposicion(folsetLlamada);
@@ -972,16 +1091,21 @@ void proposicion_e_s(set folset)
         scanner();
 
         if (sbol->codigo == CSHR) scanner();
-        else error_handler(28);
+        else
+        {
+			error_handler(28);
+			flagDetenerGenCod=1;
+		}
 
         if (sbol->codigo== CIDENT)
-        {
-            strcpy(ultimoID,sbol->lexema);
-        }
+            {
+                strcpy(ultimoID,sbol->lexema);
+            }
         if (sbol->codigo== CIDENT && en_tabla(sbol->lexema) == NIL)
         {
             flagUltimoIDError=1;
             error_handler(33);// identificador no declarado
+            flagDetenerGenCod=1;
             // agregar manej para fcion no declarada, etc
             inf_id->clase=CLASVAR; //SI EL ID NO ESTA EN LA TS, LO DAMOS DE ALTA COMO VBLE
             strcpy(inf_id->nbre,ultimoID);
@@ -996,7 +1120,11 @@ void proposicion_e_s(set folset)
         while (sbol->codigo == CSHR || sbol->codigo==CIDENT)
         {
             if (sbol->codigo == CSHR) scanner();
-            else error_handler(28);
+            else
+            {
+				error_handler(28);
+				flagDetenerGenCod=1;
+			}
 
             flagUltimoIDError=0;
 
@@ -1009,6 +1137,7 @@ void proposicion_e_s(set folset)
             {
                 flagUltimoIDError=1;
                 error_handler(33);// identificador no declarado
+                flagDetenerGenCod=1;
                 // agregar manej para fcion no declarada, etc
                 inf_id->clase=CLASVAR; //SI EL ID NO ESTA EN LA TS, LO DAMOS DE ALTA COMO VBLE
                 strcpy(inf_id->nbre,ultimoID);
@@ -1021,31 +1150,47 @@ void proposicion_e_s(set folset)
             variable(folsetLlamada);
         }
         if (sbol->codigo == CPYCOMA) scanner();
-        else error_handler(22);
+        else
+        {
+			error_handler(22);
+			flagDetenerGenCod=1;
+		}
         break;
     }
     case COUT:
-    {
-        flagEnPropES=1;
+    {   flagEnPropES=1;
         scanner();
         if (sbol->codigo == CSHL) scanner();
-        else error_handler(29);
+        else
+        {
+			error_handler(29);
+			flagDetenerGenCod=1;
+		}
         folsetLlamada= une(folset,une(cons(CSHL|CPYCOMA,NADA),first(EXPRESION)));
         expresion(folsetLlamada);
         while (sbol->codigo == CSHL || in(sbol->codigo,first(EXPRESION)))
         {
             if (sbol->codigo == CSHL) scanner();
-            else error_handler(29);
+            else
+            {
+				error_handler(29);
+				flagDetenerGenCod=1;
+			}
             folsetLlamada= une(folset,une(cons(CSHL|CPYCOMA,NADA),first(EXPRESION)));
             expresion(folsetLlamada);
         }
         if (sbol->codigo == CPYCOMA) scanner();
-        else error_handler(22);
+        else
+        {
+			error_handler(22);
+			flagDetenerGenCod=1;
+		}
         flagEnPropES=0;
         break;
     }
     default:
         error_handler(25);
+        flagDetenerGenCod=1;
     }
     test(folset,cons(NADA,NADA),64);
 }
@@ -1059,7 +1204,11 @@ void proposicion_retorno(set folset)
     folsetLlamada= une(folset,cons(CPYCOMA,NADA));
     expresion(folsetLlamada);
     if (sbol->codigo == CPYCOMA) scanner();
-    else error_handler(22);
+    else
+    {
+		error_handler(22);
+		flagDetenerGenCod=1;
+	}
 
     existeReturn=1;
     /// Aqui colocaremos el codigo para controlar el tipo de retorno. i think.
@@ -1077,14 +1226,18 @@ void proposicion_expresion(set folset)
             sbol->codigo == CCONS_ENT || sbol->codigo == CCONS_FLO ||
             sbol->codigo == CCONS_CAR || sbol->codigo == CCONS_STR)
 
-    {
-        folsetLlamada= une(folset,cons(CPYCOMA,NADA));
-        expresion(folsetLlamada);
-    }
+        {
+            folsetLlamada= une(folset,cons(CPYCOMA,NADA));
+            expresion(folsetLlamada);
+        }
 
 
     if (sbol->codigo == CPYCOMA) scanner();
-    else error_handler(22);
+    else
+    {
+		error_handler(22);
+		flagDetenerGenCod=1;
+	}
 
     test(folset,cons(NADA,NADA),66);
 }
@@ -1132,7 +1285,10 @@ void expresion_simple(set folset)
         if(sbol->codigo == CMAS || sbol->codigo == CMENOS || sbol->codigo == COR )
             scanner();
         else
+        {
             error_handler(78);
+            flagDetenerGenCod=1;
+		}
         folsetLlamada= une(folset,une(cons(NADA,CMAS|CMENOS|COR),first(TERMINO)));
         termino(folsetLlamada);
     }
@@ -1150,7 +1306,10 @@ void termino(set folset)
         if(sbol->codigo == CMULT || sbol->codigo == CDIV || sbol->codigo == CAND )
             scanner();
         else
+        {
             error_handler(78);
+            flagDetenerGenCod=1;
+		}
         folsetLlamada= une(folset,une(cons(NADA,CMULT|CDIV|CAND),first(FACTOR)));
         factor(folsetLlamada);
     }
@@ -1171,6 +1330,7 @@ void factor(set folset)
         {
             flagUltimoIDError=1;
             error_handler(33);// identificador no declarado
+            flagDetenerGenCod=1;
             // agregar manej para fcion no declarada, etc
             inf_id->clase=CLASVAR; //SI EL ID NO ESTA EN LA TS, LO DAMOS DE ALTA COMO VBLE
             strcpy(inf_id->nbre,ultimoID);
@@ -1214,6 +1374,7 @@ void factor(set folset)
                                     else
                                     {
                                         error_handler(21);
+                                        flagDetenerGenCod=1;
                                     }
                                 }
 
@@ -1222,15 +1383,17 @@ void factor(set folset)
                                     if(flagLlamadaFcion!=1)
                                     {
                                         error_handler(44);
+                                        flagDetenerGenCod=1;
                                     }
 
                                 }
 
-                            }
+                        }
                         }
                         else
                         {
                             error_handler(16);
+                            flagDetenerGenCod=1;
                         }
                         //se trata de un parametro formal.
                         ///hacer chequeo de tipos para parametro formal
@@ -1239,6 +1402,7 @@ void factor(set folset)
                     {
                         //Error: se esperaba un factor
                         error_handler(31);
+                        flagDetenerGenCod=1;
                     }
 
                 }
@@ -1254,7 +1418,10 @@ void factor(set folset)
         break;
     case CCONS_STR:
         if(!flagEnPropES)
+        {
             error_handler(85);
+            flagDetenerGenCod=1;
+		}
         scanner();
         break;/* errores de recuperacion de errores */
 
@@ -1264,7 +1431,11 @@ void factor(set folset)
         folsetLlamada= une(folset,cons(CPAR_CIE,NADA));
         expresion(folsetLlamada);
         if (sbol->codigo == CPAR_CIE) scanner();
-        else error_handler(20);
+        else
+        {
+			error_handler(20);
+			flagDetenerGenCod=1;
+		}
         break;
     }
     case CNEG:
@@ -1275,6 +1446,7 @@ void factor(set folset)
     }
     default:
         error_handler(31);
+        flagDetenerGenCod=1;
     }
     test(folset,cons(NADA,NADA),69);
 
@@ -1286,104 +1458,126 @@ void variable(set folset)
     if(sbol->codigo==CIDENT)
     {
         scanner();
+
         if (sbol->codigo == CCOR_ABR)
-        {
-            if(ts[en_tabla(ultimoID)].ets->ptr_tipo!=en_tabla("TIPOARREGLO")) // el ultimo id no es un arreglo
-            {
-                if(ts[en_tabla(ultimoID)].ets->ptr_tipo==en_tabla("TIPOERROR")) // es una llamada a una vble no declarada
-                {
-                    if(flagUltimoIDError) // cambia el tipo del id de vble a arreglo, y su tipo base a error
-                    {
-                        ts[en_tabla(ultimoID)].ets->ptr_tipo=en_tabla("TIPOARREGLO");
-                        ts[en_tabla(ultimoID)].ets->desc.part_var.arr.ptero_tipo_base=en_tabla("TIPOERROR");
-                        error_handler(48);
-                    }
-                    else
-                    {
-                        if(en_nivel_actual(ultimoID)!=NIL) //el id está en este nivel, pero declarado como vble
-                        {
-                            error_handler(32);
-                        }
-                        else // en id esta en un nivel anterior, y por eso se lo da de alta como un arr de tipo error
-                        {
+		{
+			if(ts[en_tabla(ultimoID)].ets->ptr_tipo!=en_tabla("TIPOARREGLO")) // el ultimo id no es un arreglo
+			{
+				if(ts[en_tabla(ultimoID)].ets->ptr_tipo==en_tabla("TIPOERROR")) // es una llamada a una vble no declarada
+				{
+					if(flagUltimoIDError) // cambia el tipo del id de vble a arreglo, y su tipo base a error
+					{
+						ts[en_tabla(ultimoID)].ets->ptr_tipo=en_tabla("TIPOARREGLO");
+						ts[en_tabla(ultimoID)].ets->desc.part_var.arr.ptero_tipo_base=en_tabla("TIPOERROR");
+						error_handler(48);
+						flagDetenerGenCod=1;
+					}
+					else
+					{
+						if(en_nivel_actual(ultimoID)!=NIL) //el id está en este nivel, pero declarado como vble
+						{
+							error_handler(32);
+							flagDetenerGenCod=1;
+						}
+						else // en id esta en un nivel anterior, y por eso se lo da de alta como un arr de tipo error
+						{
 
-                            inf_id->clase=CLASVAR;
-                            strcpy(inf_id->nbre,ultimoID);
-                            inf_id->ptr_tipo=en_tabla("TIPOARREGLO");
-                            inf_id->desc.part_var.arr.ptero_tipo_base=en_tabla("TIPOERROR");
-                            inf_id->desc.nivel=getTopeTB();
-                            insertarTS();
-                            error_handler(48);
-                        }
-                    }
-                }
-                else
-                {
-                    if(en_nivel_actual(ultimoID)!=NIL) // ya esta declarado como vble en este nivel, por lo tanto no puede usarse como arreglo
-                    {
-                        error_handler(32);
-                    }
-                    else
-                    {
-                        // Insertamos el id en la TS-----------------------------------------
-                        inf_id->clase=CLASVAR;
-                        strcpy(inf_id->nbre,ultimoID);
-                        inf_id->ptr_tipo=en_tabla("TIPOARREGLO");
-                        inf_id->desc.part_var.arr.ptero_tipo_base=en_tabla("TIPOERROR");
-                        inf_id->desc.nivel=getTopeTB();
-                        insertarTS();
-                        //----------------------------------------------------------------
-                        error_handler(48);
-                    }
-                }
+							inf_id->clase=CLASVAR;
+							strcpy(inf_id->nbre,ultimoID);
+							inf_id->ptr_tipo=en_tabla("TIPOARREGLO");
+							inf_id->desc.part_var.arr.ptero_tipo_base=en_tabla("TIPOERROR");
+							inf_id->desc.nivel=getTopeTB();
+							insertarTS();
+							error_handler(48);
+							flagDetenerGenCod=1;
+						}
+					}
+				}
+				else
+				{
+					if(en_nivel_actual(ultimoID)!=NIL) // ya esta declarado como vble en este nivel, por lo tanto no puede usarse como arreglo
+					{
+						error_handler(32);
+						flagDetenerGenCod=1;
+					}
+					else
+					{
+						// Insertamos el id en la TS-----------------------------------------
+						inf_id->clase=CLASVAR;
+						strcpy(inf_id->nbre,ultimoID);
+						inf_id->ptr_tipo=en_tabla("TIPOARREGLO");
+						inf_id->desc.part_var.arr.ptero_tipo_base=en_tabla("TIPOERROR");
+						inf_id->desc.nivel=getTopeTB();
+						insertarTS();
+						//----------------------------------------------------------------
+						error_handler(48);
+						flagDetenerGenCod=1;
+					}
+				}
 
-            }
-            else
-            {
-                /// Uso correcto. Acá van chequeos de tipo y eso...
-            }
-            scanner(); //consumimos el corchete que abre
-            folsetLlamada= une(folset,cons(CCOR_CIE,NADA));
-            expresion(folsetLlamada);
-            if (sbol->codigo == CCOR_CIE) scanner();
-            else error_handler(21);
-        }
-        else
-        {
-            if(flagUltimoIDError) // no viene un corchete que abre, entonces se trata del uso de una vble no declarada
-            {
-                error_handler(47);
-            }
-            else
-            {
-                if(ts[en_tabla(ultimoID)].ets->ptr_tipo==en_tabla("TIPOARREGLO") && flagLlamadaFcion!=1) // si el arr se usa como parametro, pueden ponerse los corchetes
-                {
-                    error_handler(40);
-                }
-                else
-                {
-                    //uso correcto de una vble
-                }
-            }
-        }
+			}
+			else
+			{
+				/// Uso correcto. Acá van chequeos de tipo y eso...
+			}
+			scanner(); //consumimos el corchete que abre
+			folsetLlamada= une(folset,cons(CCOR_CIE,NADA));
+			expresion(folsetLlamada);
+			if (sbol->codigo == CCOR_CIE) scanner();
+			else
+			{
+				error_handler(21);
+				flagDetenerGenCod=1;
+			}
+		}
+		else
+		{
+			if(flagUltimoIDError) // no viene un corchete que abre, entonces se trata del uso de una vble no declarada
+			{
+				error_handler(47);
+				flagDetenerGenCod=1;
+			}
+			else
+			{
+				if(ts[en_tabla(ultimoID)].ets->ptr_tipo==en_tabla("TIPOARREGLO") && flagLlamadaFcion!=1) // si el arr se usa como parametro, pueden ponerse los corchetes
+				{
+					error_handler(40);
+					flagDetenerGenCod=1;
+				}
+				else
+				{
+					//uso correcto de una vble
+				}
+			}
+		}
     }
     else
     {
         error_handler(16);
-        if(sbol->codigo==CCOR_ABR)
-            scanner();
-        if(in(sbol->codigo,first(EXPRESION)))
+        flagDetenerGenCod=1;
+
+        if (sbol->codigo == CCOR_ABR)
         {
-            folsetLlamada= une(folset,cons(CCOR_CIE,NADA));
-            expresion(folsetLlamada);
-        }
-        if(sbol->codigo==CCOR_CIE)
-        scanner;
+			scanner();
+		}
+
+        if (in(sbol->codigo, first(EXPRESION)))
+        {
+			folsetLlamada= une(folset,cons(CCOR_CIE,NADA));
+			expresion(folsetLlamada);
+		}
+
+		if (sbol->codigo == CCOR_CIE)
+        {
+			scanner();
+		}
+
+
     }
 
 
-flagUltimoIDError=0;
-test(folset,cons(NADA,NADA),71);
+    flagUltimoIDError=0;
+    test(folset,cons(NADA,NADA),71);
 }
 
 void llamada_funcion(set folset)
@@ -1399,13 +1593,18 @@ void llamada_funcion(set folset)
     else
     {
         error_handler(16);
+        flagDetenerGenCod=1;
     }
 
 
 
 
     if (sbol->codigo == CPAR_ABR) scanner();
-    else error_handler(19);
+    else
+    {
+		error_handler(19);
+		flagDetenerGenCod=1;
+	}
 
     if (sbol->codigo == CMAS || sbol->codigo == CMENOS ||
             sbol->codigo == CIDENT ||
@@ -1413,12 +1612,12 @@ void llamada_funcion(set folset)
             sbol->codigo == CCONS_ENT || sbol->codigo == CCONS_FLO ||
             sbol->codigo == CCONS_CAR || sbol->codigo == CCONS_STR)
 
-    {
+        {
         flagLlamadaFcion=1;
         folsetLlamada= une(folset,cons(CPAR_CIE,NADA));
         lista_expresiones(folsetLlamada);
         flagLlamadaFcion=0;
-    }
+        }
 
     if (sbol->codigo == CPAR_CIE)
     {
@@ -1427,12 +1626,17 @@ void llamada_funcion(set folset)
             if(cantParReales!=ts[en_tabla(funcionActual)].ets->desc.part_var.sub.cant_par) //controlamos que la cant de pars actuales concuerde con la de formales
             {
                 error_handler(82);
+                flagDetenerGenCod=1;
             }
         }
 
         scanner();
     }
-    else error_handler(20);
+    else
+    {
+		error_handler(20);
+		flagDetenerGenCod=1;
+	}
     test(folset,cons(NADA,NADA),72);
 }
 
@@ -1448,7 +1652,10 @@ void lista_expresiones(set folset)
         if(sbol->codigo==CCOMA)
             scanner();
         else
+        {
             error_handler(75);
+            flagDetenerGenCod=1;
+		}
         folsetLlamada= une(folset,une(cons(CCOMA,NADA),first(EXPRESION)));
         expresion(folsetLlamada);
         cantParReales++;
@@ -1472,6 +1679,7 @@ void constante(set folset)
         break;
     default:
         error_handler(38);
+        flagDetenerGenCod=1;
     }
     test(folset,cons(NADA,NADA),74);
 
@@ -1482,65 +1690,36 @@ set first(int metodo)
 {
     switch(metodo)
     {
-    case CONSTANTE:
-        return cons(NADA,CCONS_ENT|CCONS_FLO|CCONS_CAR);
-    case DECLARACION:
-        return cons(CVOID|CCHAR|CINT|CFLOAT,NADA);
-    case DECLARACIONES:
-        return cons(CVOID|CCHAR|CINT|CFLOAT,NADA);
-    case DECLARACION_PARAMETRO:
-        return cons(CVOID|CCHAR|CINT|CFLOAT,NADA);
-    case DECLARACION_VARIABLE:
-        return cons(CASIGNAC|CCOR_ABR|CCOMA|CPYCOMA,NADA);
-    case DECLARADOR_INIT:
-        return cons(CASIGNAC|CCOR_ABR,NADA);
+        case CONSTANTE: return cons(NADA,CCONS_ENT|CCONS_FLO|CCONS_CAR);
+        case DECLARACION: return cons(CVOID|CCHAR|CINT|CFLOAT,NADA);
+        case DECLARACIONES: return cons(CVOID|CCHAR|CINT|CFLOAT,NADA);
+        case DECLARACION_PARAMETRO:  return cons(CVOID|CCHAR|CINT|CFLOAT,NADA);
+        case DECLARACION_VARIABLE: return cons(CASIGNAC|CCOR_ABR|CCOMA|CPYCOMA,NADA);
+        case DECLARADOR_INIT: return cons(CASIGNAC|CCOR_ABR,NADA);
         //case DECLARADOR_INIT: return cons(CASIGNAC|CCOR_ABR|CCOMA|CPYCOMA,NADA);
-    case DEFINICION_FUNCION:
-        return cons(CPAR_ABR,NADA);
-    case ESPECIFICADOR_DECLARACION:
-        return cons(CPAR_ABR|CASIGNAC|CCOR_ABR|CCOMA|CPYCOMA,NADA);
-    case ESPECIFICADOR_TIPO:
-        return cons(CVOID|CCHAR|CINT|CFLOAT,NADA);
-    case EXPRESION:
-        return cons(CPAR_ABR,CMAS|CMENOS|CNEG|CIDENT|CCONS_CAR|CCONS_ENT|CCONS_FLO|CCONS_STR);
-    case EXPRESION_SIMPLE:
-        return cons(CPAR_ABR,CMAS|CMENOS|CNEG|CIDENT|CCONS_CAR|CCONS_ENT|CCONS_FLO|CCONS_STR);
-    case FACTOR:
-        return cons(CPAR_ABR,CNEG|CIDENT|CCONS_CAR|CCONS_ENT|CCONS_FLO|CCONS_STR);
-    case LISTA_DECLARACIONES:
-        return cons(CVOID|CCHAR|CINT|CFLOAT,NADA);
-    case LISTA_DECLARACIONES_PARAM:
-        return cons(CVOID|CCHAR|CINT|CFLOAT,NADA);
-    case LISTA_EXPRESIONES:
-        return cons(CPAR_ABR,CMAS|CMENOS|CNEG|CIDENT|CCONS_CAR|CCONS_ENT|CCONS_FLO|CCONS_STR);
-    case LISTA_INICIALIZADORES:
-        return cons(NADA,CCONS_CAR|CCONS_ENT|CCONS_FLO);
-    case LISTA_PROPOSICIONES:
-        return cons(CWHILE|CIF|CIN|COUT|CPYCOMA|CPAR_ABR|CLLA_ABR,CCONS_CAR|CCONS_ENT|CCONS_FLO|CCONS_STR|CIDENT|CMAS|CMENOS|CNEG|CRETURN);
-    case LLAMADA_FUNCION:
-        return cons(NADA,CIDENT);
-    case PROPOSICION:
-        return cons(CWHILE|CIF|CIN|COUT|CPYCOMA|CPAR_ABR|CLLA_ABR,CCONS_CAR|CCONS_ENT|CCONS_FLO|CCONS_STR|CIDENT|CMAS|CMENOS|CNEG|CRETURN);
-    case PROPOSICION_COMPUESTA:
-        return cons(CLLA_ABR,NADA);
-    case PROPOSICION_EXPRESION:
-        return cons(CPAR_ABR|CPYCOMA,CMAS|CMENOS|CNEG|CIDENT|CCONS_CAR|CCONS_ENT|CCONS_FLO|CCONS_STR);
-    case PROPOSICION_E_S:
-        return cons(CIN|COUT,NADA);
-    case PROPOSICION_ITERACION:
-        return cons(CWHILE,NADA);
-    case PROPOSICION_RETORNO:
-        return cons(CRETURN,NADA);
-    case PROPOSICION_SELECCION:
-        return cons(CIF,NADA);
-    case TERMINO:
-        return cons(CPAR_ABR,CNEG|CCONS_CAR|CCONS_ENT|CCONS_FLO|CCONS_STR|CIDENT);
-    case UNIDAD_TRADUCCION:
-        return cons(CVOID|CCHAR|CINT|CFLOAT,NADA);
-    case VARIABLE:
-        return cons(NADA,CIDENT);
-    case LISTA_DECLARACIONES_INIT:
-        return cons(NADA,CIDENT);
+        case DEFINICION_FUNCION: return cons(CPAR_ABR,NADA);
+        case ESPECIFICADOR_DECLARACION: return cons(CPAR_ABR|CASIGNAC|CCOR_ABR|CCOMA|CPYCOMA,NADA);
+        case ESPECIFICADOR_TIPO: return cons(CVOID|CCHAR|CINT|CFLOAT,NADA);
+        case EXPRESION: return cons(CPAR_ABR,CMAS|CMENOS|CNEG|CIDENT|CCONS_CAR|CCONS_ENT|CCONS_FLO|CCONS_STR);
+        case EXPRESION_SIMPLE: return cons(CPAR_ABR,CMAS|CMENOS|CNEG|CIDENT|CCONS_CAR|CCONS_ENT|CCONS_FLO|CCONS_STR);
+        case FACTOR: return cons(CPAR_ABR,CNEG|CIDENT|CCONS_CAR|CCONS_ENT|CCONS_FLO|CCONS_STR);
+        case LISTA_DECLARACIONES: return cons(CVOID|CCHAR|CINT|CFLOAT,NADA);
+        case LISTA_DECLARACIONES_PARAM: return cons(CVOID|CCHAR|CINT|CFLOAT,NADA);
+        case LISTA_EXPRESIONES: return cons(CPAR_ABR,CMAS|CMENOS|CNEG|CIDENT|CCONS_CAR|CCONS_ENT|CCONS_FLO|CCONS_STR);
+        case LISTA_INICIALIZADORES: return cons(NADA,CCONS_CAR|CCONS_ENT|CCONS_FLO);
+        case LISTA_PROPOSICIONES: return cons(CWHILE|CIF|CIN|COUT|CPYCOMA|CPAR_ABR|CLLA_ABR,CCONS_CAR|CCONS_ENT|CCONS_FLO|CCONS_STR|CIDENT|CMAS|CMENOS|CNEG|CRETURN);
+        case LLAMADA_FUNCION: return cons(NADA,CIDENT);
+        case PROPOSICION: return cons(CWHILE|CIF|CIN|COUT|CPYCOMA|CPAR_ABR|CLLA_ABR,CCONS_CAR|CCONS_ENT|CCONS_FLO|CCONS_STR|CIDENT|CMAS|CMENOS|CNEG|CRETURN);
+        case PROPOSICION_COMPUESTA: return cons(CLLA_ABR,NADA);
+        case PROPOSICION_EXPRESION: return cons(CPAR_ABR|CPYCOMA,CMAS|CMENOS|CNEG|CIDENT|CCONS_CAR|CCONS_ENT|CCONS_FLO|CCONS_STR);
+        case PROPOSICION_E_S: return cons(CIN|COUT,NADA);
+        case PROPOSICION_ITERACION: return cons(CWHILE,NADA);
+        case PROPOSICION_RETORNO: return cons(CRETURN,NADA);
+        case PROPOSICION_SELECCION: return cons(CIF,NADA);
+        case TERMINO: return cons(CPAR_ABR,CNEG|CCONS_CAR|CCONS_ENT|CCONS_FLO|CCONS_STR|CIDENT);
+        case UNIDAD_TRADUCCION: return cons(CVOID|CCHAR|CINT|CFLOAT,NADA);
+        case VARIABLE: return cons(NADA,CIDENT);
+        case LISTA_DECLARACIONES_INIT: return cons(NADA,CIDENT);
     }
 }
 
@@ -1551,6 +1730,7 @@ void test(set cjto1,set cjto2,int n)
     {
 
         error_handler(n);
+        flagDetenerGenCod=1;
         cjto1= une(cjto1,cjto2);
         while(!in(sbol->codigo,cjto1))
         {

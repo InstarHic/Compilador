@@ -1162,6 +1162,7 @@ case 34:
 YY_RULE_SETUP
 #line 324 "scanner.token.lex"
 {error_handler(5);
+flagDetenerGenCod=1;
    vez = 0;
   }
 	YY_BREAK
